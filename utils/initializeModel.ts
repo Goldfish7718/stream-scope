@@ -24,7 +24,7 @@ export const getCommentModel = () => {
        
 
     const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY as string);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro", systemInstruction: `You are a comments summarizer. You will recieve an array of comments of a youtube video and all you need to do is summarize it.`, safetySettings });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro", systemInstruction: `You are a comments summarizer. You will recieve an array of comments of a youtube video and all you need to do is summarize it in only one paragraph of plain text.`, safetySettings });
 
     return model
 }
