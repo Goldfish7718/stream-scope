@@ -5,27 +5,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import extractVideoId from "@/utils/extractId";
-import { getCommentModel } from "@/utils/initializeModel";
 import axios from "axios";
 import { ChartNoAxesColumn, Clipboard, Loader2, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { TextGenerateEffect } from "@/components/text-generate-effect";
-import Sentiment from 'sentiment'
 import {
   ChartConfig,
   ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
 import { Pie, PieChart } from "recharts";
-
-interface SentimentObject {
-  label: string;
-  value: number;
-  fill: string;
-}
+import analyzeSentiment from "@/utils/analyzeSentiment";
+import { SentimentObject } from "@/utils/types";
+import { useToast } from "@/components/ui/use-toast";
+import generateSummary from "@/utils/generateSummary";
 
 export default function Home() {
 
@@ -34,23 +32,9 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [numberOfComments, setNumberOfComments] = useState(1000);
   const [commentSummary, setCommentSummary] = useState("");
-  const [sentimentObject, setSentimentObject] = useState<SentimentObject[]>([
-    {
-      label: "positive",
-      value: 0, 
-      fill: '#0000FF'
-    },
-    {
-      label: "negative",
-      value: 0,
-      fill: '#FF0000'
-    },
-    {
-      label: "neutral",
-      value: 0, 
-      fill: '#808080'
-    },
-  ]);
+  const [sentimentObject, setSentimentObject] = useState<SentimentObject[]>([]);
+
+  const { toast } = useToast()
 
   const chartConfig = {
     positive: {
@@ -65,40 +49,29 @@ export default function Home() {
   } as ChartConfig
 
   const summaryRef = useRef<HTMLDivElement>(null)
+  const topRef = useRef<HTMLDivElement>(null)
 
   const handleSubmit = async () => {
     try {
       setLoading(true)
       setComments([])
       setCommentSummary("")
-      const sentiment = new Sentiment()
 
       let nextPageToken;
-      let res;
       let batchComments: string[] = []
-
-      const sentimentObjectCopy: SentimentObject[] = [
-        {
-          label: "positive",
-          value: 0, 
-          fill: '#0000FF'
-        },
-        {
-          label: "negative",
-          value: 0,
-          fill: '#FF0000'
-        },
-        {
-          label: "neutral",
-          value: 0, 
-          fill: '#808080'
-        },
-      ]
 
       const videoId = extractVideoId(url)
 
       do {
-        res = await axios.get(`https://www.googleapis.com/youtube/v3/commentThreads?key=${process.env.NEXT_PUBLIC_YOUTUBE_API_KEY}&part=snippet&videoId=${videoId}&maxResults=100${nextPageToken ? `&pageToken=${nextPageToken}` : ""}`);
+        const res: any = await axios.get(`https://www.googleapis.com/youtube/v3/commentThreads`, {
+          params: {
+            key: process.env.NEXT_PUBLIC_YOUTUBE_API_KEY,
+            part: 'snippet',
+            videoId,
+            maxResults: 100,
+            pageToken: nextPageToken || ""            
+          }
+        })
 
         const newComments = res.data.items.map((item: any) => {
           return item.snippet.topLevelComment.snippet.textOriginal
@@ -109,38 +82,29 @@ export default function Home() {
         nextPageToken = res.data.nextPageToken ? res.data.nextPageToken : null
       } while (nextPageToken && batchComments.length < numberOfComments)
 
-      console.log(batchComments);
-      
-      batchComments.map(comment => {
-        const result = sentiment.analyze(comment).score
-        if (result == 0) {
-          sentimentObjectCopy[2].value++
-        } else if (result > 0) {
-          sentimentObjectCopy[0].value++
-        } else {
-          sentimentObjectCopy[1].value++
-        }
-      })
-
-      setSentimentObject(sentimentObjectCopy)
-      console.log(sentimentObjectCopy);
-
-      //  Generate comment summaries
-      const commentModel = getCommentModel()
-
-      let result = await commentModel.generateContent(JSON.stringify(batchComments.slice(0, 100)));
-      let response = await result.response;
-      let text = response.text();
-
-      console.log(text);
-      
-      setCommentSummary(text)
+      setSentimentObject(analyzeSentiment(batchComments))
+      setCommentSummary(await generateSummary(batchComments))
       setComments(batchComments)
     } catch (error) {
       console.log(error);
+      toast({
+        title: "Sorry, an error occured",
+        description: "Please try later",
+        variant: "destructive",
+        duration: 3000
+      })
     } finally {
       setLoading(false)
     }
+  }
+
+  const copyToClipboard = async () => {
+    navigator.clipboard.writeText(commentSummary).then(() => {
+      toast({
+        title: "Copied to clipboard",
+        duration: 1000
+      })
+    })
   }
 
   useEffect(() => {
@@ -150,15 +114,16 @@ export default function Home() {
       }
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
     } else {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      topRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
     }
   }, [commentSummary])
 
   return (
     <main className="mt-28">
+      <div ref={topRef}></div>
       <section className="text-center flex flex-col gap-4">
-        <h1 className="font-extrabold text-7xl bg-gradient-to-r from-pink-400 to-purple-300 bg-clip-text text-transparent">stream-scope</h1>
-        <p className="text-lg font-light text-neutral-700">Get AI generated analysis of YouTube videos for free</p>
+        <h1 className="font-extrabold text-xl sm:text-3xl md:text-7xl bg-gradient-to-r from-pink-400 to-purple-300 bg-clip-text text-transparent">stream-scope</h1>
+        <p className="text-sm md:text-lg font-light text-neutral-700">Get AI generated analysis of YouTube videos for free</p>
       </section>
 
       <div className="flex justify-center w-1/2 gap-2 mt-12 mx-auto">
@@ -184,14 +149,16 @@ export default function Home() {
       </div>
 
       {commentSummary && 
-        <section className="my-12 flex" ref={summaryRef}>
-          <Card className="w-1/2 m-4">
+        <section className="my-12 flex flex-col md:flex-row" ref={summaryRef}>
+
+          {/* AI SUMMARY */}
+          <Card className="md:w-1/2 m-4 w-full">
             <CardHeader className="flex flex-row justify-between items-center">
               <CardTitle className="flex items-center">
                 AI-generated summary
                 <Sparkles size={28} className="mx-2" />
               </CardTitle>
-              <Button variant='outline' size='sm'><Clipboard size={16} /></Button>
+              <Button variant='outline' size='sm' onClick={copyToClipboard}><Clipboard size={16} /></Button>
             </CardHeader>
             <Separator />
             <CardContent className="p-4">
@@ -202,12 +169,15 @@ export default function Home() {
               <p className="text-neutral-600 text-sm">This summary is only generated on 100 comments due to token constraints and may not be entirely accurate</p>
             </CardFooter>
           </Card>
-          <Card className="w-1/2 m-4 h-fit">
-            <CardHeader>
+
+          {/* SENTIMENT ANALYSIS PIE CHART */}
+          <Card className="md:w-1/2 m-4 w-full">
+            <CardHeader className="flex">
               <CardTitle className="flex items-center">
                 Sentiment Analysis
                 <ChartNoAxesColumn size={28} className="mx-2" />
               </CardTitle>
+              <p className="text-sm text-neutral-400 self-start">&#40;{comments.length} comments fetched&#41;</p>
             </CardHeader>
             <Separator />
             <CardContent className="p-4">
@@ -220,11 +190,18 @@ export default function Home() {
                     cursor={false}
                     content={<ChartTooltipContent hideLabel />}
                   />
-                  <Pie data={sentimentObject} dataKey="value" nameKey="label" />
+                  <Pie data={sentimentObject} dataKey="value" nameKey="label" label />
+                  <ChartLegend 
+                    content={<ChartLegendContent nameKey="label" />}
+                  />
                 </PieChart>
               </ChartContainer>
 
-              <p className="text-center text-neutral-700 mt-6">Total Postive comments: {sentimentObject[0].value}</p>
+              <div className="mt-6 flex gap-2 justify-center">
+                <h4 className="bg-blue-200 text-blue-700 p-1 rounded-md">{((sentimentObject[0].value / comments.length) * 100).toFixed(1)}%</h4>
+                <h4 className="bg-red-200 text-red-700 p-1 rounded-md">{((sentimentObject[1].value / comments.length) * 100).toFixed(1)}%</h4>
+                <h4 className="bg-yellow-200 text-yellow-700 p-1 rounded-md">{((sentimentObject[2].value / comments.length) * 100).toFixed(1)}%</h4>
+              </div>
             </CardContent>
           </Card>
         </section>
