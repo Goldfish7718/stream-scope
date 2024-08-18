@@ -122,19 +122,19 @@ export default function Home() {
     <main className="mt-28">
       <div ref={topRef}></div>
       <section className="text-center flex flex-col gap-4">
-        <h1 className="font-extrabold text-xl sm:text-3xl md:text-7xl bg-gradient-to-r from-pink-400 to-purple-300 bg-clip-text text-transparent">stream-scope</h1>
-        <p className="text-sm md:text-lg font-light text-neutral-700">Get AI generated analysis of YouTube videos for free</p>
+        <h1 className="font-extrabold text-4xl sm:text-5xl md:text-7xl bg-gradient-to-r from-pink-400 to-purple-300 bg-clip-text text-transparent">stream-scope</h1>
+        <p className="text-lg md:text-xl font-light text-neutral-700 mx-2 sm:mx-0">Get AI generated analysis of YouTube videos for free</p>
       </section>
 
-      <div className="flex justify-center w-1/2 gap-2 mt-12 mx-auto">
-        <Input className="w-2/3" placeholder="eg: https://www.youtube.com/watch?v=4r15Y4QVg2P8" onChange={e => setUrl(e.target.value)}/>
-        <Button className="w-1/3" onClick={handleSubmit} disabled={loading}>
+      <div className="flex justify-center gap-2 mt-12 mx-2">
+        <Input className="md:w-[30%] sm:w-3/5 w-2/3" placeholder="eg: https://www.youtube.com/watch?v=4r15Y4QVg2P8" onChange={e => setUrl(e.target.value)}/>
+        <Button className="md:w-1/5 sm:w-2/5 w-1/3" onClick={handleSubmit} disabled={loading}>
           {loading ? <Loader2 className="animate-spin duration-300" /> : 'Analyze'}
         </Button>
       </div>
 
-      <div className="flex flex-col items-center mt-12 gap-8">
-        <Label className="text-lg text-neutral-700">Select number of comments for analysis</Label>
+      <div className="flex flex-col items-center mt-12 gap-8 mx-2">
+        <Label className="text-sm sm:text-lg text-neutral-700">Select number of comments for analysis</Label>
         <Slider
           defaultValue={[1000]}
           min={1000}
@@ -145,14 +145,14 @@ export default function Home() {
           className="w-1/3"
         />
 
-        <h3 className="text-xl font-bold text-neutral-900">{numberOfComments} comments</h3>
+        <h3 className="text-lg md:text-xl font-bold text-neutral-900">{numberOfComments} comments</h3>
       </div>
 
       {commentSummary && 
         <section className="my-12 flex flex-col md:flex-row" ref={summaryRef}>
 
           {/* AI SUMMARY */}
-          <Card className="md:w-1/2 m-4 w-full">
+          <Card className="md:w-1/2 m-4">
             <CardHeader className="flex flex-row justify-between items-center">
               <CardTitle className="flex items-center">
                 AI-generated summary
@@ -171,7 +171,7 @@ export default function Home() {
           </Card>
 
           {/* SENTIMENT ANALYSIS PIE CHART */}
-          <Card className="md:w-1/2 m-4 w-full">
+          <Card className="md:w-1/2 m-4">
             <CardHeader className="flex">
               <CardTitle className="flex items-center">
                 Sentiment Analysis
