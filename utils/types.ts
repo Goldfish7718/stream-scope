@@ -3,3 +3,8 @@ export interface SentimentObject {
     value: number;
     fill: string;
 }
+
+export interface ManualCommentType {
+    comment: string;
+    score: number;
+}

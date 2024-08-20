@@ -13,7 +13,7 @@ import { TextGenerateEffect } from "@/components/text-generate-effect";
 import { ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Pie, PieChart } from "recharts";
 import { analyzeSentiment, extractVideoId, generateSummary } from "@/utils";
-import { SentimentObject } from "@/utils/types";
+import { ManualCommentType, SentimentObject } from "@/utils/types";
 import { useToast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
 import CountUp from "react-countup";
@@ -27,8 +27,9 @@ export default function Home() {
   const [commentSummary, setCommentSummary] = useState("");
   const [sentimentObject, setSentimentObject] = useState<SentimentObject[]>([]);
   const [progress, setProgress] = useState(0);
+  const [manualComments, setManualComments] = useState<ManualCommentType[]>([]);
 
-  const summaryRef = useRef<HTMLDivElement>(null)
+  const graphRef = useRef<HTMLDivElement>(null)
   const topRef = useRef<HTMLDivElement>(null)
 
   const { toast } = useToast()
@@ -88,12 +89,14 @@ export default function Home() {
         setProgress(20 + (iteration / maxIterations) * 80);
       } while (nextPageToken && batchComments.length < numberOfComments)
 
-      setProgress(90)
+      setProgress(100)
 
-      setSentimentObject(analyzeSentiment(batchComments))
+      const sentimentResults = analyzeSentiment(batchComments)
+
+      setSentimentObject(sentimentResults.sentimentResults)
+      setManualComments(sentimentResults.manualComments)
       setCommentSummary(await generateSummary(batchComments))
 
-      setProgress(100)
       setComments(batchComments)
 
     } catch (error) {
@@ -118,14 +121,25 @@ export default function Home() {
     })
   }
 
+  const generateColor = (score: number)  => {
+    if (score > 0) {
+      return `bg-blue-200 text-blue-700 py-1 px-2 rounded-md`
+    } else if (score < 0) {
+      return `bg-red-200 text-red-700 py-1 px-2 rounded-md`
+    } else {
+      return `bg-yellow-200 text-yellow-700 py-1 px-2 rounded-md`
+    }
+  }
+
   useEffect(() => {
     if (commentSummary) {
-      if (summaryRef.current) {
-        summaryRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      if (graphRef.current) {
+        graphRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
       }
-      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
     } else {
-      topRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+      topRef.current?.scrollIntoView({ behavior: 'smooth', block: "end" })
     }
   }, [commentSummary])
 
@@ -175,61 +189,76 @@ export default function Home() {
       }
 
       {commentSummary && 
-        <section className="my-12 flex flex-col md:flex-row" ref={summaryRef}>
+        <section className="my-12">
+          <div className="my-4 flex flex-col-reverse md:flex-row">
+            {/* AI SUMMARY */}
+            <Card className="md:w-1/2 m-4">
+              <CardHeader className="flex flex-row justify-between items-center">
+                <CardTitle className="flex items-center">
+                  AI-generated summary
+                  <Sparkles size={28} className="mx-2" />
+                </CardTitle>
+                <Button variant='outline' size='sm' onClick={copyToClipboard}><Clipboard size={16} /></Button>
+              </CardHeader>
+              <Separator />
+              <CardContent className="p-4">
+                <TextGenerateEffect words={commentSummary} />
+              </CardContent>
+              {/* <Separator /> */}
+              <CardFooter className="p-4">
+                <p className="text-yellow-700 text-sm bg-yellow-100 rounded-md py-2 px-4">This summary is only generated on 100 comments due to token constraints and may not be entirely accurate</p>
+              </CardFooter>
+            </Card>
 
-          {/* AI SUMMARY */}
-          <Card className="md:w-1/2 m-4">
-            <CardHeader className="flex flex-row justify-between items-center">
-              <CardTitle className="flex items-center">
-                AI-generated summary
-                <Sparkles size={28} className="mx-2" />
-              </CardTitle>
-              <Button variant='outline' size='sm' onClick={copyToClipboard}><Clipboard size={16} /></Button>
-            </CardHeader>
-            <Separator />
-            <CardContent className="p-4">
-              <TextGenerateEffect words={commentSummary} />
-            </CardContent>
-            <Separator />
-            <CardFooter className="p-4">
-              <p className="text-neutral-600 text-sm">This summary is only generated on 100 comments due to token constraints and may not be entirely accurate</p>
-            </CardFooter>
-          </Card>
+            {/* SENTIMENT ANALYSIS PIE CHART */}
+            <Card className="md:w-1/2 m-4" ref={graphRef}>
+              <CardHeader className="flex">
+                <CardTitle className="flex items-center">
+                  Sentiment Analysis
+                  <ChartNoAxesColumn size={28} className="mx-2" />
+                </CardTitle>
+                <p className="text-sm text-neutral-400 self-start">&#40;{comments.length} comments fetched&#41;</p>
+              </CardHeader>
+              <Separator />
+              <CardContent className="p-4">
+                <ChartContainer
+                  config={chartConfig}
+                  className="mx-auto aspect-square max-h-[250px]"
+                  >
+                  <PieChart>
+                    <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent hideLabel />}
+                      />
+                    <Pie data={sentimentObject} dataKey="value" nameKey="label" label />
+                    <ChartLegend 
+                      content={<ChartLegendContent nameKey="label" />}
+                      />
+                  </PieChart>
+                </ChartContainer>
 
-          {/* SENTIMENT ANALYSIS PIE CHART */}
-          <Card className="md:w-1/2 m-4">
-            <CardHeader className="flex">
-              <CardTitle className="flex items-center">
-                Sentiment Analysis
-                <ChartNoAxesColumn size={28} className="mx-2" />
-              </CardTitle>
-              <p className="text-sm text-neutral-400 self-start">&#40;{comments.length} comments fetched&#41;</p>
-            </CardHeader>
-            <Separator />
-            <CardContent className="p-4">
-              <ChartContainer
-                config={chartConfig}
-                className="mx-auto aspect-square max-h-[250px]"
-              >
-                <PieChart>
-                  <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent hideLabel />}
-                  />
-                  <Pie data={sentimentObject} dataKey="value" nameKey="label" label />
-                  <ChartLegend 
-                    content={<ChartLegendContent nameKey="label" />}
-                  />
-                </PieChart>
-              </ChartContainer>
+                <div className="mt-6 flex gap-2 justify-center">
+                  <h4 className="bg-blue-200 text-blue-700 p-1 rounded-md">{((sentimentObject[0].value / comments.length) * 100).toFixed(1)}%</h4>
+                  <h4 className="bg-red-200 text-red-700 p-1 rounded-md">{((sentimentObject[1].value / comments.length) * 100).toFixed(1)}%</h4>
+                  <h4 className="bg-yellow-200 text-yellow-700 p-1 rounded-md">{((sentimentObject[2].value / comments.length) * 100).toFixed(1)}%</h4>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-              <div className="mt-6 flex gap-2 justify-center">
-                <h4 className="bg-blue-200 text-blue-700 p-1 rounded-md">{((sentimentObject[0].value / comments.length) * 100).toFixed(1)}%</h4>
-                <h4 className="bg-red-200 text-red-700 p-1 rounded-md">{((sentimentObject[1].value / comments.length) * 100).toFixed(1)}%</h4>
-                <h4 className="bg-yellow-200 text-yellow-700 p-1 rounded-md">{((sentimentObject[2].value / comments.length) * 100).toFixed(1)}%</h4>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="grid sm:grid-cols-2 grid-cols-1">
+            {manualComments.map((commentObj, index) => (
+              <Card className="m-2" key={index}>
+                <CardContent className="p-4">
+                  <h3>{commentObj.comment}</h3>
+                </CardContent>
+                <CardFooter>
+                  <h3 className={generateColor(commentObj.score)}>{commentObj.score > 0 ? "Postive" : commentObj.score < 0 ? "Negative" : "Neutral"}</h3>
+                </CardFooter>
+              </Card>
+            ))
+            }
+          </div>
         </section>
       }
     </main>

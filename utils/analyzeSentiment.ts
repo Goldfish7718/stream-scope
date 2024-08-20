@@ -1,38 +1,48 @@
-import { SentimentObject } from "./types";
+import { ManualCommentType, SentimentObject } from "./types";
 import Sentiment from "sentiment";
 
-export const sentimentObjectCopy: SentimentObject[] = [
-  {
-    label: "positive",
-    value: 0, 
-    fill: '#0000FF'
-  },
-  {
-    label: "negative",
-    value: 0,
-    fill: '#FF0000'
-  },
-  {
-    label: "neutral",
-    value: 0, 
-    fill: '#fef08a'
-  },
-]
+export default function analyzeSentiment(comments: string[]) {
+  const sentiment = new Sentiment();
+  const manualComments: ManualCommentType[] = [];
 
-export default function analyzeSentiment (comments: string[]) {
+  const manualCommentCount = {
+    "positive": 0,
+    "negative": 0,
+    "neutral": 0
+  };
 
-    const sentiment = new Sentiment()
+  const sentimentResults: SentimentObject[] = [
+      { label: "positive", value: 0, fill: '#0000FF' },
+      { label: "negative", value: 0, fill: '#FF0000' },
+      { label: "neutral", value: 0, fill: '#fef08a' },
+  ];
 
-    comments.map(comment => {
-        const result = sentiment.analyze(comment).score
-        if (result == 0) {
-          sentimentObjectCopy[2].value++
-        } else if (result > 0) {
-          sentimentObjectCopy[0].value++
-        } else {
-          sentimentObjectCopy[1].value++
+  comments.forEach(comment => {
+      const result = sentiment.analyze(comment).score;
+
+      if (result > 0) {
+        sentimentResults[0].value++;
+        if (manualCommentCount.positive < 2) {
+          manualComments.push({ comment, score: result });
+          manualCommentCount.positive++;
         }
-    })
+      } else if (result < 0) {
+        sentimentResults[1].value++;
+        if (manualCommentCount.negative < 2) {
+          manualComments.push({ comment, score: result });
+          manualCommentCount.negative++;
+        }
+      } else {
+        sentimentResults[2].value++;
+        if (manualCommentCount.neutral < 2) {
+          manualComments.push({ comment, score: result });
+          manualCommentCount.neutral++;
+        }
+      }
+  });
 
-    return sentimentObjectCopy
+  return {
+    sentimentResults,
+    manualComments
+  };
 }
