@@ -3,4 +3,3 @@ export interface SentimentObject {
     value: number;
     fill: string;
 }
-  

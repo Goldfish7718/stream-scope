@@ -4,26 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import extractVideoId from "@/utils/extractId";
 import axios from "axios";
 import { ChartNoAxesColumn, Clipboard, Loader2, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { TextGenerateEffect } from "@/components/text-generate-effect";
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart"
+import { ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Pie, PieChart } from "recharts";
-import analyzeSentiment from "@/utils/analyzeSentiment";
+import { analyzeSentiment, extractVideoId, generateSummary } from "@/utils";
 import { SentimentObject } from "@/utils/types";
 import { useToast } from "@/components/ui/use-toast";
-import generateSummary from "@/utils/generateSummary";
+import { Progress } from "@/components/ui/progress";
+import CountUp from "react-countup";
 
 export default function Home() {
 
@@ -33,6 +26,10 @@ export default function Home() {
   const [numberOfComments, setNumberOfComments] = useState(1000);
   const [commentSummary, setCommentSummary] = useState("");
   const [sentimentObject, setSentimentObject] = useState<SentimentObject[]>([]);
+  const [progress, setProgress] = useState(0);
+
+  const summaryRef = useRef<HTMLDivElement>(null)
+  const topRef = useRef<HTMLDivElement>(null)
 
   const { toast } = useToast()
 
@@ -48,19 +45,25 @@ export default function Home() {
     }
   } as ChartConfig
 
-  const summaryRef = useRef<HTMLDivElement>(null)
-  const topRef = useRef<HTMLDivElement>(null)
-
   const handleSubmit = async () => {
     try {
+
       setLoading(true)
       setComments([])
       setCommentSummary("")
+      setSentimentObject([])
+
+      setProgress(10)
 
       let nextPageToken;
       let batchComments: string[] = []
 
       const videoId = extractVideoId(url)
+
+      setProgress(20)
+
+      let iteration = 0;
+      const maxIterations = 50;
 
       do {
         const res: any = await axios.get(`https://www.googleapis.com/youtube/v3/commentThreads`, {
@@ -80,11 +83,19 @@ export default function Home() {
         batchComments = [...batchComments, ...newComments]
 
         nextPageToken = res.data.nextPageToken ? res.data.nextPageToken : null
+
+        iteration++;
+        setProgress(20 + (iteration / maxIterations) * 80);
       } while (nextPageToken && batchComments.length < numberOfComments)
+
+      setProgress(90)
 
       setSentimentObject(analyzeSentiment(batchComments))
       setCommentSummary(await generateSummary(batchComments))
+
+      setProgress(100)
       setComments(batchComments)
+
     } catch (error) {
       console.log(error);
       toast({
@@ -147,6 +158,21 @@ export default function Home() {
 
         <h3 className="text-lg md:text-xl font-bold text-neutral-900">{numberOfComments} comments</h3>
       </div>
+
+      {loading && 
+        <div className="flex flex-col items-center my-6 gap-1">
+          <Progress value={progress} className="w-1/2" />
+          <div>
+            <CountUp 
+              preserveValue={true} 
+              end={Math.round(progress)} 
+              useEasing={false}
+              duration={.5}
+            />
+            <span>%</span>
+          </div>
+        </div>
+      }
 
       {commentSummary && 
         <section className="my-12 flex flex-col md:flex-row" ref={summaryRef}>
